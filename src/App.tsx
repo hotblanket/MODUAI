@@ -47,9 +47,21 @@ export default function App() {
     }];
   });
   const [activeSessionId, setActiveSessionId] = useState("default");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [input, setInput] = useState("");
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (!mobile) setIsSidebarOpen(true);
+      else setIsSidebarOpen(false);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -88,6 +100,7 @@ export default function App() {
       ],
       createdAt: new Date(),
     };
+    if (isMobile) setIsSidebarOpen(false);
     setSessions(prev => [newSession, ...prev]);
     setActiveSessionId(newSession.id);
   };
@@ -220,6 +233,19 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-[#FDFCFB] text-[#1A1A1A] font-sans selection:bg-[#FF6B6B]/20 overflow-hidden">
+      {/* Sidebar Overlay for Mobile */}
+      <AnimatePresence>
+        {isMobile && isSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden"
+          />
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -227,7 +253,17 @@ export default function App() {
             initial={{ x: -300, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
-            className="w-72 border-r border-[#1A1A1A10] bg-white flex flex-col z-20"
+            drag={isMobile ? "x" : false}
+            dragConstraints={{ left: -300, right: 0 }}
+            dragElastic={0.05}
+            onDragEnd={(_, info) => {
+              if (info.offset.x < -50) setIsSidebarOpen(false);
+            }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className={cn(
+              "w-72 border-r border-[#1A1A1A10] bg-white flex flex-col z-40 transition-all duration-300",
+              isMobile ? "fixed inset-y-0 left-0" : "relative"
+            )}
           >
             <div className="p-4 border-b border-[#1A1A1A10]">
               <button
@@ -243,7 +279,10 @@ export default function App() {
               {sessions.map((session) => (
                 <button
                   key={session.id}
-                  onClick={() => setActiveSessionId(session.id)}
+                  onClick={() => {
+                    setActiveSessionId(session.id);
+                    if (isMobile) setIsSidebarOpen(false);
+                  }}
                   className={cn(
                     "w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl transition-all group text-left",
                     activeSessionId === session.id
@@ -281,7 +320,7 @@ export default function App() {
 
       <div className="flex-1 flex flex-col relative h-full overflow-hidden">
         {/* Header */}
-        <header className="flex items-center justify-between px-6 py-4 border-b border-[#1A1A1A10] bg-white/80 backdrop-blur-md sticky top-0 z-10 transition-all shrink-0">
+        <header className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-[#1A1A1A10] bg-white/80 backdrop-blur-md sticky top-0 z-10 transition-all shrink-0">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -428,6 +467,19 @@ export default function App() {
             </div>
           </div>
 
+          {/* Right Sidebar Overlay for Mobile */}
+          <AnimatePresence>
+            {isMobile && isRightPanelOpen && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsRightPanelOpen(false)}
+                className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden"
+              />
+            )}
+          </AnimatePresence>
+
           {/* Right Sidebar (Mode Selection) */}
           <AnimatePresence>
             {isRightPanelOpen && (
@@ -435,7 +487,11 @@ export default function App() {
                 initial={{ x: 300, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: 300, opacity: 0 }}
-                className="w-80 border-l border-[#1A1A1A10] bg-white p-6 flex flex-col z-20"
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                className={cn(
+                  "w-80 border-l border-[#1A1A1A10] bg-white p-6 flex flex-col z-40 transition-all duration-300",
+                  isMobile ? "fixed inset-y-0 right-0" : "relative"
+                )}
               >
                 <div className="flex items-center justify-between mb-8 text-[#1A1A1A]">
                   <h2 className="text-sm font-bold uppercase tracking-widest px-1">Model & Mode</h2>
@@ -532,27 +588,8 @@ export default function App() {
         </div>
 
         {/* Floating Input Area */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#FDFCFB] via-[#FDFCFB]/95 to-transparent pointer-events-none">
+        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-[#FDFCFB] via-[#FDFCFB]/95 to-transparent pointer-events-none">
           <div className="max-w-3xl mx-auto pointer-events-auto">
-            {/* Suggestion Chips */}
-            {!isLoading && messages.length < 3 && (
-              <div className="mb-4 flex flex-wrap gap-2 animate-fade-in-up">
-                {[
-                  { icon: <MessageSquare size={14} />, text: "오늘 날씨 어때?" },
-                  { icon: <ImageIcon size={14} />, text: "멋진 우주 정거장 그려줘" },
-                  { icon: <Code size={14} />, text: "리액트 카운터 코드 알려줘" },
-                  { icon: <Brain size={14} />, text: "상대성 이론 쉽게 설명해줘" },
-                ].map((chip) => (
-                  <button
-                    key={chip.text}
-                    onClick={() => setInput(chip.text)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-[#1A1A1A]/10 rounded-full text-xs font-bold text-[#1A1A1A]/60 hover:border-[#1A1A1A]/30 hover:bg-[#1A1A1A]/5 transition-all active:scale-95 shadow-sm"
-                  >
-                    {chip.icon} {chip.text}
-                  </button>
-                ))}
-              </div>
-            )}
 
             <div className="relative group">
               <textarea
