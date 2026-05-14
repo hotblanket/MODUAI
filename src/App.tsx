@@ -170,11 +170,18 @@ export default function App() {
             : s
         ));
       }
-    } catch (error) {
+    } catch (error: any) {
+      let errorText = "죄송합니다. 현재 요청을 처리하는 중에 문제가 발생했습니다. 일시적인 네트워크 오류일 수 있으니 잠시 후 다시 시도해 주세요.";
+      
+      const errorString = error?.message || String(error);
+      if (errorString.includes("429") || errorString.includes("RESOURCE_EXHAUSTED")) {
+        errorText = "죄송합니다. 현재 사용 가능한 할당량(Quota)을 모두 소진했습니다. 잠시 후 다시 시도하시거나, [설정 > 비밀번호] 패널에서 결제가 활성화된 API 키를 선택해 주세요. (무료 티어는 사용량이 제한될 수 있습니다.)";
+      }
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "ai",
-        content: "오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        content: errorText,
         type: "text",
         timestamp: new Date(),
         model: activeSession.model,
