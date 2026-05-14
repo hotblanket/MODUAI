@@ -1,9 +1,21 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAI() {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not defined. Please set it in your environment variables.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+}
 
 export async function chatWithGemini(prompt: string, history: { role: string; parts: { text: string }[] }[] = [], modelName: string = "Gemini") {
   try {
+    const ai = getAI();
     const personas: Record<string, string> = {
       Gemini: "당신은 Google의 Gemini입니다. 친절하고 신속하게 답변하세요.",
       ChatGPT: "당신은 OpenAI의 ChatGPT입니다. 논리적이고 명확하게 답변하세요.",
@@ -37,6 +49,7 @@ ${personas[modelName] || personas.Gemini}
 
 export async function generateImageWithGemini(prompt: string) {
   try {
+    const ai = getAI();
     const enhancedPrompt = `Masterpiece, high quality, 8k, highly detailed, professional digital art, photorealistic if applicable: ${prompt}`;
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-image",
