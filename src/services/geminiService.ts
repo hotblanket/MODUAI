@@ -37,30 +37,50 @@ ${personas[modelName] || personas.Gemini}
 
 모든 답변은 한국어로 작성하며, 전문적이면서도 친숙한 톤을 유지하세요.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [...history, { role: "user", parts: [{ text: prompt }] }],
-      config: {
-        systemInstruction,
-        tools: [{ googleSearch: {} }],
-      },
-    });
+    const maxRetries = 3;
+    let lastError: any = null;
 
-    let resultText = response.text;
-    
-    // Append grounding links if available
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    if (groundingChunks && groundingChunks.length > 0) {
-      const links = groundingChunks
-        .filter(chunk => chunk.web?.uri)
-        .map(chunk => `[${chunk.web?.title || '출처'}](${chunk.web?.uri})`);
-      
-      if (links.length > 0) {
-        resultText += "\n\n**참고 자료:**\n" + links.join("\n");
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-2.0-flash",
+          contents: [...history, { role: "user", parts: [{ text: prompt }] }],
+          config: {
+            systemInstruction,
+            tools: [{ googleSearch: {} }],
+          },
+        });
+
+        let resultText = response.text;
+        
+        // Append grounding links if available
+        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+        if (groundingChunks && groundingChunks.length > 0) {
+          const links = groundingChunks
+            .filter(chunk => chunk.web?.uri)
+            .map(chunk => `[${chunk.web?.title || '출처'}](${chunk.web?.uri})`);
+          
+          if (links.length > 0) {
+            resultText += "\n\n**참고 자료:**\n" + links.join("\n");
+          }
+        }
+
+        return resultText;
+      } catch (error: any) {
+        lastError = error;
+        console.warn(`Retry ${i + 1}/${maxRetries} for Text generation due to error:`, error);
+        if (i < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1)));
+        }
       }
     }
 
-    return resultText;
+    const errorStr = String(lastError?.message || lastError);
+    if (errorStr.includes("429") || errorStr.includes("RESOURCE_EXHAUSTED")) {
+      return "현재 이용량이 많아 요청이 거부되었습니다. 잠시 후 다시 시도해 주세요.";
+    }
+    
+    return "요청하신 작업을 완료하는 중에 일시적인 지연이 발생했습니다. 잠시 후 다시 시도해 주시면 감사하겠습니다.";
   } catch (error) {
     console.error("Gemini API Error (Text):", error);
     throw error;
@@ -71,24 +91,39 @@ export async function generateImageWithGemini(prompt: string) {
   try {
     const ai = getAI();
     const enhancedPrompt = `Masterpiece, high quality, 8k, highly detailed, professional digital art, photorealistic if applicable: ${prompt}`;
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: {
-        parts: [{ text: enhancedPrompt }],
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: "1:1",
-        },
-      },
-    });
+    
+    const maxRetries = 3;
+    let lastError: any = null;
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const response = await ai.models.generateContent({
+                model: "gemini-2.0-flash",
+                contents: {
+                    parts: [{ text: enhancedPrompt }],
+                },
+                config: {
+                    imageConfig: {
+                        aspectRatio: "1:1",
+                    },
+                },
+            });
+
+            for (const part of response.candidates?.[0]?.content?.parts || []) {
+                if (part.inlineData) {
+                    return `data:image/png;base64,${part.inlineData.data}`;
+                }
+            }
+            throw new Error("No image data returned from Gemini");
+        } catch (error) {
+            lastError = error;
+            console.warn(`Retry ${i + 1}/${maxRetries} for Image generation due to error:`, error);
+            if (i < maxRetries - 1) {
+                await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1)));
+            }
+        }
     }
-    throw new Error("No image generated");
+    throw lastError;
   } catch (error) {
     console.error("Gemini API Error (Image):", error);
     throw error;
