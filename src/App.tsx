@@ -174,11 +174,13 @@ export default function App() {
       console.error("Chat Error:", error);
       let errorText = "죄송합니다. 현재 요청을 처리하는 중에 문제가 발생했습니다. 일시적인 네트워크 오류일 수 있으니 잠시 후 다시 시도해 주세요.";
       
-      const errorStr = typeof error === 'string' ? error : JSON.stringify(error);
-      const isQuotaError = errorStr.includes("429") || errorStr.includes("RESOURCE_EXHAUSTED");
+      const errorStr = String(error?.message || error?.statusText || (typeof error === 'object' ? JSON.stringify(error) : error));
+      const isQuotaError = errorStr.includes("429") || errorStr.includes("RESOURCE_EXHAUSTED") || errorStr.includes("quota");
       
       if (isQuotaError) {
         errorText = "죄송합니다. 현재 사용 가능한 할당량(Quota)을 모두 소진했습니다. 잠시 후 다시 시도하시거나, 다른 API 키를 사용해 주세요. (무료 티어는 사용량이 제한될 수 있습니다.)";
+      } else if (errorStr.includes("API_KEY_INVALID") || errorStr.includes("API key not found")) {
+        errorText = "API 키가 올바르지 않거나 설정되지 않았습니다. [설정 > 비밀번호] 메뉴에서 API 키를 확인해 주세요.";
       }
 
       const errorMessage: Message = {

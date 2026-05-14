@@ -38,7 +38,7 @@ ${personas[modelName] || personas.Gemini}
 모든 답변은 한국어로 작성하며, 전문적이면서도 친숙한 톤을 유지하세요.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: [...history, { role: "user", parts: [{ text: prompt }] }],
       config: {
         systemInstruction,
@@ -72,7 +72,7 @@ export async function generateImageWithGemini(prompt: string) {
     const ai = getAI();
     const enhancedPrompt = `Masterpiece, high quality, 8k, highly detailed, professional digital art, photorealistic if applicable: ${prompt}`;
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-image",
+      model: "gemini-2.0-flash",
       contents: {
         parts: [{ text: enhancedPrompt }],
       },
